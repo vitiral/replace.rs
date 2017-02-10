@@ -1,0 +1,9 @@
+[package]
+authors = ["Garrett Berg <vitiral@gmail.com>"]
+name = "replace"
+version = "0.1.0"
+
+[dependencies]
+clap = "2.20.3"
+error-chain = "0.9.0"
+regex = "0.2.1"

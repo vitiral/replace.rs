@@ -9,11 +9,13 @@ extern crate clap;
 #[macro_use]
 extern crate error_chain;
 
-use clap as cl;
+#[macro_use]
+extern crate maplit;
 
-mod types;
 mod cmd;
-
+mod load;
+mod replace;
+mod types;
 
 
 fn main() {

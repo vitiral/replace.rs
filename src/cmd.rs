@@ -1,6 +1,7 @@
 //! cmd definition and parsing
 
 use std::str;
+use std::iter::Iterator;
 
 use clap as cl;
 
@@ -69,11 +70,12 @@ pub fn get_app<'a, 'b>() -> cl::App<'a, 'b> where 'a: 'b {
 }
 
 
-fn parse_named_groups<'a>(raw: Vec<&'a str>) -> Result<NamedGroups<'a>> {
-    let mut groups  = NamedGroups::new();
-    for r in raw {
-        let (_, s) = r.split_at(2);
-        let mut split = s.splitn(2, "=");
+fn parse_groups<'a, I>(raw: I) -> Result<Groups<'a>> 
+        where I: Iterator<Item=&'a str> {
+    let mut pos = PosGroups::new();
+    let mut named = NamedGroups::new();
+    for (i, r) in raw.enumerate() {
+        let mut split = r.splitn(2, "=");
         let name = match (&mut split).next() {
             Some(n) => n,
             None => {
@@ -88,9 +90,34 @@ fn parse_named_groups<'a>(raw: Vec<&'a str>) -> Result<NamedGroups<'a>> {
                 return Err(ErrorKind::Cmd(msg).into());
             }
         };
-        groups.insert(name, value.as_bytes());
+
+        if let Ok(p) = name.parse::<usize>() {
+            pos.insert(p, value.as_bytes());
+        } else {
+            let g = NamedGroup { id: i, replace: value.as_bytes() };
+            named.insert(name, g);
+        }
     }
-    Ok(groups)
+
+    if !named.is_empty() && !pos.is_empty() {
+        let msg = "cannot replace both positional and named groups".to_string();
+        Err(ErrorKind::Cmd(msg).into())
+    } else if !named.is_empty() {
+        panic!("ERROR: named not yet implemented");
+        //Groups::Named(named)
+    } else if !pos.is_empty() {
+        Ok(Groups::Pos(pos))
+    } else {
+        let msg = "must replace one of positional or named groups".to_string();
+        Err(ErrorKind::Cmd(msg).into())
+    }
+}
+
+fn parse_trail<'a>(trail: Vec<&'a str>) -> Result<(Vec<&'a str>, Groups<'a>)> {
+    let mut itrail = trail.iter();
+    let paths: Vec<&str> = (&mut itrail).take_while(|s| **s != "--").map(|s| *s).collect();
+    let groups = parse_groups(itrail.map(|s| *s))?;
+    Ok((paths, groups))
 }
 
 pub fn get_cmd<'a>(matches: &'a cl::ArgMatches) -> Result<Cmd<'a>> {
@@ -103,38 +130,50 @@ pub fn get_cmd<'a>(matches: &'a cl::ArgMatches) -> Result<Cmd<'a>> {
     };
 
     let trail: Vec<&str> = matches.values_of("other").unwrap().collect();
-    let mut itrail = trail.iter();
-    let paths: Vec<&str> = (&mut itrail).take_while(|s| **s != "--").map(|s| *s).collect();
+    let (paths, groups) = parse_trail(trail)?;
+    println!("paths: {:?}\ngroups: {:?}", paths, groups);
 
-    let mut named: Vec<&str> = Vec::new();
-    let mut positional: Vec<&[u8]> = Vec::new();
-
-    for g in itrail {
-        if g.starts_with("--") {
-            named.push(g);
-        } else {
-            positional.push(g.as_bytes());
-        }
-    }
-    let named = parse_named_groups(named)?;
-
-    println!("paths: {:?}\nnamed: {:?}\npos:  {:?}", paths, named, positional);
-
-    let groups = if !named.is_empty() && !positional.is_empty() {
-        let msg = "cannot replace both positional and named groups".to_string();
-        return Err(ErrorKind::Cmd(msg).into());
-    } else if !named.is_empty() {
-        Groups::Named(named)
-    //} else if !positional.is_empty() {
-    //    Groups::Pos(positional)
-    } else {
-        let msg = "must replace one of positional or named groups".to_string();
-        return Err(ErrorKind::Cmd(msg).into());
-    };
 
     Ok(Cmd {
         regex: regex, 
         paths: paths,
         groups: groups,
     })
+}
+
+#[test]
+fn test_parse() {
+    // test some invalid args
+    {
+        // mixed args
+        //let result = parse_groups(vec!["0=all", "foo=bar"].iter().map(|s| *s));
+        //assert!(result.is_err(), "{:?}", result);
+        
+        // no equal
+        let result = parse_groups(vec!["foo", "0=bar"].iter().map(|s| *s));
+        assert!(result.is_err(), "{:?}", result);
+    }
+    
+    // positional args
+    {
+        let args = vec!["0=all", "1=a", "2=b"];
+        let result = parse_groups(args.iter().map(|s| *s)).unwrap();
+        let expected = Groups::Pos(hashmap!{
+            0 => "all".as_bytes(), 
+            1 => "a".as_bytes(), 
+            2 => "b".as_bytes()
+        });
+        assert_eq!(result, expected);
+    }
+
+    // parse trail
+    {
+        let trail = vec!["file1", "file2", "--", "1=a"];
+        let (files, groups) = parse_trail(trail).unwrap();
+        let expected = Groups::Pos(hashmap!{
+            1 => "a".as_bytes(), 
+        });
+        assert_eq!(groups, expected);
+        assert_eq!(files, vec!["file1", "file2"]);
+    }
 }

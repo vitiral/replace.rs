@@ -36,14 +36,22 @@ error_chain! {
     }
 }
 
-pub type NamedGroups<'a> = HashMap<&'a str, &'a [u8]>;
+#[derive(Debug, PartialEq)]
+pub struct NamedGroup<'a> {
+    pub id: usize,
+    pub replace: &'a [u8],
+}
+
+pub type NamedGroups<'a> = HashMap<&'a str, NamedGroup<'a>>;
 pub type PosGroups<'a> = HashMap<usize, &'a [u8]>;
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum Groups<'a> {
     Named(NamedGroups<'a>),
     Pos(PosGroups<'a>),
 }
+
+// Cmd types
 
 #[derive(Debug)]
 pub struct Cmd<'a> {
@@ -63,12 +71,16 @@ impl<'a> Cmd<'a> {
     }
 }
 
+// Loading types
+
 /// representation of loaded file
 pub struct File<'a> {
     pub path: &'a Path,
     pub data: Vec<u8>,
 }
 
+
+// Replacing helper types
 
 #[derive(Debug)]
 pub struct MatchedGroup<'a> {
@@ -80,8 +92,8 @@ pub struct MatchedGroup<'a> {
 impl<'a> MatchedGroup<'a> {
     /// return whether this group encompases another
     pub fn is_superset(&self, other: &MatchedGroup) -> bool {
-        if self.mat.start() < other.mat.start() &&
-                self.mat.end() > other.mat.end() &&
+        if self.mat.start() <= other.mat.start() &&
+                self.mat.end() >= other.mat.end() &&
                 self.group_id < other.group_id {
             true
         } else {

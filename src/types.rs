@@ -1,4 +1,5 @@
 pub use std::io::{Read, Write};
+pub use std::rc::Rc;
 
 pub use std::path::{Path, PathBuf};
 pub use std::collections::HashMap;
@@ -56,7 +57,7 @@ pub enum Groups<'a> {
 #[derive(Debug)]
 pub struct Cmd<'a> {
     pub regex: Regex,
-    pub paths: Vec<&'a str>,
+    pub paths: Vec<&'a Path>,
     pub groups: Groups<'a>,
 }
 
@@ -71,14 +72,13 @@ impl<'a> Cmd<'a> {
     }
 }
 
-// Loading types
+// File system
 
 /// representation of loaded file
-pub struct File<'a> {
-    pub path: &'a Path,
+pub struct File {
+    pub path: Rc<PathBuf>,
     pub data: Vec<u8>,
 }
-
 
 // Replacing helper types
 

@@ -29,8 +29,8 @@ ADDITIONAL:
 
 EXAMPLE: 
 ```
-set PATTERN = 'The (cat) went over the (hill) to find his friend (?P<friend>Mittens)`
-replace $PATTERN path1 path2 -- dog bridge --friend=Scrappy
+export PATTERN='The (cat) went over the (hill) to find his friend (Mittens)`
+replace $PATTERN path1 path2 -- 1=dog 2=bridge 3=Scrappy
 ```
 
 Breaking this down:
@@ -113,13 +113,15 @@ fn parse_groups<'a, I>(raw: I) -> Result<Groups<'a>>
     }
 }
 
-fn parse_trail<'a>(trail: Vec<&'a str>) -> Result<(Vec<&'a str>, Groups<'a>)> {
+fn parse_trail<'a>(trail: Vec<&'a str>) -> Result<(Vec<&'a Path>, Groups<'a>)> {
     let mut itrail = trail.iter();
-    let paths: Vec<&str> = (&mut itrail).take_while(|s| **s != "--").map(|s| *s).collect();
+    let paths: Vec<&Path> = (&mut itrail).take_while(|s| **s != "--")
+        .map(|s| Path::new(*s)).collect();
     let groups = parse_groups(itrail.map(|s| *s))?;
     Ok((paths, groups))
 }
 
+/// main entry point for getting the command settings
 pub fn get_cmd<'a>(matches: &'a cl::ArgMatches) -> Result<Cmd<'a>> {
     let regex = match Regex::new(matches.value_of("pattern").unwrap()) {
         Ok(r) => r,
@@ -174,6 +176,6 @@ fn test_parse() {
             1 => "a".as_bytes(), 
         });
         assert_eq!(groups, expected);
-        assert_eq!(files, vec!["file1", "file2"]);
+        assert_eq!(files, vec![Path::new("file1"), Path::new("file2")]);
     }
 }

@@ -88,12 +88,20 @@ impl<'a> Replacer for Replace<'a> {
     }
 }
 
-fn replace<'a>(cmd: &Cmd, data: &[u8]) -> Vec<u8> {
+pub fn replace(cmd: &Cmd, data: &[u8]) -> Vec<u8> {
     let r = Replace { groups: &cmd.groups };
 
     Vec::from(cmd.regex.replace_all(data, r))
 }
 
+pub fn replace_file(cmd: &Cmd, file: &File) -> File {
+    let path = file.path.clone();
+    let data = replace(cmd, &file.data);
+    File {
+        path: path,
+        data: data,
+    }
+}
 
 fn do_replace(c: &Cmd, d: &[u8]) -> String {
     str::from_utf8(&replace(c, d)).unwrap().to_string()
